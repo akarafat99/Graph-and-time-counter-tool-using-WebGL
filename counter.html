@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Time counter</title>
+    <style>
+        body {
+            text-align: center;
+        }
+
+        /* Container for the input and canvas */
+        .container {
+            text-align: center;
+            margin: 30px 20px;
+        }
+
+        /* Style for input field */
+        input[type="number"] {
+            padding: 10px;
+            width: auto;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.1);
+            outline: none;
+            transition: box-shadow 0.3s ease-in-out;
+        }
+
+        input[type="number"]:focus {
+            box-shadow: 2px 2px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Style for the button */
+        button {
+            margin-top: 10px;
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.1);
+            transition: background-color 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+            box-shadow: 2px 2px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Style for the canvas */
+        canvas {
+            margin-top: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            box-shadow: 0px 0px 15px rgb(185, 178, 178);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Timer (Counter)</h1>
+        <input type="number" id="userInput" maxlength="4" placeholder="Enter seconds (max 9999)">
+        <!-- Container for buttons -->
+        <div class="btn-container">
+            <button onclick="startCountdown()">Start Countdown</button>
+            <button onclick="location.reload()">Stop</button>
+        </div>
+        <br>
+        <canvas id="canvas" width="600px" height="400px"></canvas>
+    </div>
+</body>
+
+<script id="vertexShader" type="x-shader/x-vertex">
+    attribute vec2 coordinate;
+    uniform mat4 u_Matrix;
+    void main(void) {
+        // Apply the transformation matrix to the vertex coordinates
+        gl_Position = u_Matrix * vec4(coordinate, 0.0, 1.0);
+    }
+</script>
+
+<script id="fragmentShader" type="x-shader/x-fragment">
+    void main(void) {
+        gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
+    }
+</script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gl-matrix/2.8.1/gl-matrix-min.js"></script>
+
+<script>
+    var canvas = document.getElementById("canvas");
+    var gl = canvas.getContext("webgl");
+
+    var vertCode = document.getElementById("vertexShader").innerHTML;
+    var fragCode = document.getElementById("fragmentShader").innerHTML;
+
+    function makeShader(gl, src, type) {
+        var shader = gl.createShader(type);
+        gl.shaderSource(shader, src);
+        gl.compileShader(shader);
+        return shader;
+    }
+
+    function makeProgram(gl, vertShader, fragShader) {
+        var program = gl.createProgram();
+        gl.attachShader(program, vertShader);
+        gl.attachShader(program, fragShader);
+        gl.linkProgram(program);
+        gl.useProgram(program);
+        return program;
+    }
+
+    function makeBuffer(gl, data) {
+        var buffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
+        return buffer;
+    }
+
+    function adjustVertexShader(gl, buffer, program, varName, size) {
+        gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+        var coordPos = gl.getAttribLocation(program, varName);
+        gl.vertexAttribPointer(coordPos, size, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(coordPos);
+    }
+
+    function reset() {
+        gl.clearColor(0, 0, 0, 1);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+    }
+
+    // Define digit shapes (as lines)
+    // using the boundary 0 to 0.5 for x and y axis
+
+    var a = [0.1, 0.5];
+    var b = [0.4, 0.5];
+    var c = [0.4, 0];
+    var d = [0.4, -0.5];
+    var e = [0.1, -0.5];
+    var f = [0.1, 0];
+
+    var digit0 = [
+        ...a, ...b,
+        ...b, ...d,
+        ...d, ...e,
+        ...e, ...a
+    ];
+
+    var digit1 = [
+        ...b, ...d
+    ];
+
+    var digit2 = [
+        ...a, ...b,
+        ...b, ...c,
+        ...c, ...f,
+        ...f, ...e,
+        ...e, ...d,
+    ];
+
+    var digit3 = [
+        ...a, ...b,
+        ...b, ...c,
+        ...c, ...f,
+        ...f, ...c,
+        ...c, ...d,
+        ...d, ...e
+    ];
+
+    var digit4 = [
+        ...a, ...f,
+        ...f, ...c,
+        ...c, ...b,
+        ...b, ...d
+    ];
+
+    var digit5 = [
+        ...b, ...a,
+        ...a, ...f,
+        ...f, ...c,
+        ...c, ...d,
+        ...d, ...e
+    ];
+
+    var digit6 = [
+        ...b, ...a,
+        ...a, ...e,
+        ...e, ...d,
+        ...d, ...c,
+        ...c, ...f
+    ];
+
+    var digit7 = [
+        ...a, ...b,
+        ...b, ...d
+    ];
+
+    var digit8 = [
+        ...a, ...b,
+        ...b, ...d,
+        ...d, ...e,
+        ...e, ...a,
+        ...a, ...f,
+        ...f, ...c
+    ];
+
+    var digit9 = [
+        ...c, ...f,
+        ...f, ...a,
+        ...a, ...b,
+        ...b, ...d,
+        ...d, ...e
+    ];
+
+    var digits = [digit0, digit1, digit2, digit3, digit4, digit5, digit6, digit7, digit8, digit9];
+    console.log(digits);
+
+
+    // Function to draw the selected shape for 'abcd'
+    function drawShape(num) {
+        reset();
+
+        var input = num;
+        // Extract digits from the number
+        var d = input % 10;  // 4 
+        input = Math.floor(input / 10);
+        var c = input % 10;  // 3 
+        input = Math.floor(input / 10); 
+        var b = input % 10;  // 2 
+        input = Math.floor(input / 10);
+        var a = input % 10;  // 1 
+
+        // Print the digits to the console
+        console.log(a + " " + b + " " + c + " " + d);
+
+
+        // Select the corresponding shapes for a, b, c, and d
+        var shapeA = digits[a];
+        console.log("A " + shapeA);
+
+        var shapeB = digits[b];
+        var shapeC = digits[c];
+        var shapeD = digits[d];
+
+        var vertShader = makeShader(gl, vertCode, gl.VERTEX_SHADER);
+        var fragShader = makeShader(gl, fragCode, gl.FRAGMENT_SHADER);
+        var program = makeProgram(gl, vertShader, fragShader);
+
+        var buffer = makeBuffer(gl, shapeC); // Main shape buffer for c
+        adjustVertexShader(gl, buffer, program, "coordinate", 2);
+
+        var matrixLocation = gl.getUniformLocation(program, "u_Matrix");
+
+        // Draw shape 'c' in the original position
+        var identityMatrix = mat4.create();
+        gl.uniformMatrix4fv(matrixLocation, false, identityMatrix);
+        gl.drawArrays(gl.LINES, 0, shapeC.length / 2);
+
+        // Draw shape 'd' shifted by +0.5 units
+        var shiftDMatrix = mat4.create();
+        mat4.translate(shiftDMatrix, shiftDMatrix, [0.5, 0, 0]); // Shift by +0.5 units
+        gl.uniformMatrix4fv(matrixLocation, false, shiftDMatrix);
+        buffer = makeBuffer(gl, shapeD);
+        adjustVertexShader(gl, buffer, program, "coordinate", 2);
+        gl.drawArrays(gl.LINES, 0, shapeD.length / 2);
+
+        // Draw shape 'a' shifted by -1 units
+        var shiftAMatrix = mat4.create();
+        mat4.translate(shiftAMatrix, shiftAMatrix, [-1.0, 0, 0]); // Shift by -1 units
+        gl.uniformMatrix4fv(matrixLocation, false, shiftAMatrix);
+        buffer = makeBuffer(gl, shapeA);
+        adjustVertexShader(gl, buffer, program, "coordinate", 2);
+        gl.drawArrays(gl.LINES, 0, shapeA.length / 2);
+
+        // Draw shape 'b' shifted by -0.5 units
+        var shiftBMatrix = mat4.create();
+        mat4.translate(shiftBMatrix, shiftBMatrix, [-0.5, 0, 0]); // Shift by -0.5 units
+        gl.uniformMatrix4fv(matrixLocation, false, shiftBMatrix);
+        buffer = makeBuffer(gl, shapeB);
+        adjustVertexShader(gl, buffer, program, "coordinate", 2);
+        gl.drawArrays(gl.LINES, 0, shapeB.length / 2);
+    }
+
+    // Countdown timer logic
+    function startCountdown() {
+        var input = document.getElementById("userInput").value;
+        var number = parseInt(input);
+        console.log(number);
+
+        var interval = setInterval(function () {
+            drawShape(number);
+            console.log(number);
+
+            if (number <= 0) {
+                clearInterval(interval); // Stop the countdown when it reaches 0
+            } else {
+                number--; // Decrease the countdown
+            }
+        }, 1000); // 1 second interval
+    }
+
+
+</script>
+
+</html>

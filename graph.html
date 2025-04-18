@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Graph</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            /* height: 100vh; */
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .input-container {
+            margin-bottom: 20px;
+            display: flex;
+            flex-direction: column;
+            width: 300px;
+            align-items: center;
+        }
+
+        input[type="text"] {
+            padding: 8px;
+            margin-top: 10px;
+            width: 100%;
+        }
+
+        button {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            width: 100%;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        canvas {
+            border: 1px solid black;
+            box-shadow: 0px 0px 10px gray;
+            margin: 10px;
+        }
+        
+    </style>
+</head>
+
+<body>
+    <h1>Graph Visualization</h1>
+    <div class="input-container">
+        <label for="pointsInput">Enter Points (comma-separated):</label>
+        <input type="text" id="pointsInput" value="0.1, 5, 5, 10, 5, 10, 5, 3, 2, 1, 13, 5">
+        <button onclick="updateGraph()">Update Graph</button>
+    </div>
+
+    <canvas id="canvas" width="1300px" height="500px"></canvas>
+
+    <script id="vertexShader" type="x-shader/x-vertex">
+        attribute vec2 coordinate;
+        attribute vec4 color;
+        varying vec4 vColor;
+        
+        void main(void) {
+            gl_Position = vec4(coordinate, 0.0, 1.0);
+            gl_PointSize = 10.0;
+            vColor = color;
+        }
+    </script>
+
+    <script id="fragmentShader" type="x-shader/x-fragment">
+        precision mediump float;
+        varying vec4 vColor;
+        void main(void) {
+            gl_FragColor = vColor;
+        }
+    </script>
+
+    <script>
+        var canvas = document.getElementById("canvas");
+        var gl = canvas.getContext("webgl");
+
+        var vertCode = document.getElementById("vertexShader").innerHTML;
+        var fragCode = document.getElementById("fragmentShader").innerHTML;
+
+        function makeShader(gl, src, type) {
+            var shader = gl.createShader(type);
+            gl.shaderSource(shader, src);
+            gl.compileShader(shader);
+            return shader;
+        }
+
+        function makeProgram(gl, vertShader, fragShader) {
+            var program = gl.createProgram();
+            gl.attachShader(program, vertShader);
+            gl.attachShader(program, fragShader);
+            gl.linkProgram(program);
+            gl.useProgram(program);
+            return program;
+        }
+
+        function makeBuffer(gl, data) {
+            var buffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+            gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
+            gl.bindBuffer(gl.ARRAY_BUFFER, null);
+            return buffer;
+        }
+
+        function adjustVertexShader(gl, buffer, program, varName, size, stride, offset) {
+            gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+            var coordPos = gl.getAttribLocation(program, varName);
+            gl.vertexAttribPointer(coordPos, size, gl.FLOAT, false, stride, offset);
+            gl.enableVertexAttribArray(coordPos);
+        }
+
+        function reset() {
+            gl.clearColor(0, 0, 0, 1);
+            gl.clear(gl.COLOR_BUFFER_BIT);
+        }
+
+        function drawCustomAxisLines1(gl, coordinates, color) {
+            let point = new Float32Array(coordinates);
+
+            let lineColorBuffer = makeBuffer(gl, new Float32Array(
+                color.length == 0 ? getDefaultColorArray1([0.5, 0.5, 0.5, 1.0], 4) : getDefaultColorArray1(color, 4)
+            ));
+
+            let pointBuffer = makeBuffer(gl, point);
+            let vertShader = makeShader(gl, vertCode, gl.VERTEX_SHADER);
+            let fragShader = makeShader(gl, fragCode, gl.FRAGMENT_SHADER);
+            let program = makeProgram(gl, vertShader, fragShader);
+
+            adjustVertexShader(gl, pointBuffer, program, "coordinate", 2, 0, 0);
+            adjustVertexShader(gl, lineColorBuffer, program, "color", 4, 4 * Float32Array.BYTES_PER_ELEMENT, 0);
+
+            gl.drawArrays(gl.LINES, 0, 4);
+        }
+
+        function getDefaultColorArray1(color, times) {
+            let finalColor = [];
+            for (let i = 0; i < times; i++) {
+                finalColor.push(...color);
+            }
+            return finalColor;
+        }
+
+        function barGraphPointsGenerator(points) {
+            let totalPoints = points.length, graphLength = 2.0, slotLen = graphLength / totalPoints, slotGap = slotLen * 0.25, yBase = 1.8, yGroundStart = -0.9;
+            let trianglePoints = [], a = [], b = [], c = [], d = [], xStart = -1.0;
+
+            for (let i = 0; i < totalPoints; i++) {
+                a.push(xStart + slotGap, (yBase * points[i]) + yGroundStart);
+                b.push(xStart + slotGap, yGroundStart);
+                c.push(xStart + slotLen - slotGap, (yBase * points[i]) + yGroundStart);
+                d.push(xStart + slotLen - slotGap, yGroundStart);
+
+                trianglePoints.push(a[0], a[1], b[0], b[1], c[0], c[1], d[0], d[1], c[0], c[1], b[0], b[1]);
+                a = [];
+                b = [];
+                c = [];
+                d = [];
+                xStart = xStart + slotLen;
+            }
+            return trianglePoints;
+        }
+
+        function normalizer1([...points]) {
+            let maxValue = Math.max(...points);
+            return points.map(point => point / maxValue);
+        }
+
+        function drawBarGraph(points) {
+            let actualPoints = [...points];
+            let point = new Float32Array(barGraphPointsGenerator(normalizer1(actualPoints)));
+            let totalPoints = point.length;
+
+            let sampleColorBuffer = makeBuffer(gl, new Float32Array(getDefaultColorArray1([1, 1, 1, 1.0], totalPoints / 2)));
+            let pointBuffer = makeBuffer(gl, point);
+
+            let vertShader = makeShader(gl, vertCode, gl.VERTEX_SHADER);
+            let fragShader = makeShader(gl, fragCode, gl.FRAGMENT_SHADER);
+            let program = makeProgram(gl, vertShader, fragShader);
+
+            adjustVertexShader(gl, pointBuffer, program, "coordinate", 2, 0, 0);
+            adjustVertexShader(gl, sampleColorBuffer, program, "color", 4, 0, 0);
+
+            gl.drawArrays(gl.TRIANGLES, 0, totalPoints / 2);
+        }
+
+        function preSet() {
+            reset();
+            drawCustomAxisLines1(gl, [
+                -0.99, -0.9,
+                +0.99, -0.9,
+                -0.99, +0.9,
+                -0.99, -0.9
+            ], []);
+        }
+
+        preSet();
+
+        let inputPoints = [0.1, 5, 5, 10, 5, 10, 5, 3, 2, 1, 13, 5];
+        drawBarGraph(inputPoints);
+
+        // Function to update graph with input points
+        function updateGraph() {
+            const pointsInput = document.getElementById("pointsInput").value;
+            inputPoints = pointsInput.split(',').map(Number);  // Convert input into an array of numbers
+            preSet();  // Reset the canvas
+            drawBarGraph(inputPoints);  // Redraw the graph with new points
+        }
+    </script>
+
+</body>
+
+</html>

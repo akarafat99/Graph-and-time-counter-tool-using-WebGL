@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Time counter and graph visualizer tool by 190122</title>
+    <style>
+        /* Global Styles */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 50px auto;
+            padding: 0 20px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 40px;
+        }
+
+        .row {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+        }
+
+        /* Card Styles */
+        .card {
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
+            width: 100%;
+            max-width: 48%;
+            margin-bottom: 20px;
+            cursor: pointer;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .card:hover {
+            transform: scale(1.05);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.25);
+        }
+
+        .card-body {
+            padding: 20px;
+            text-align: center;
+        }
+
+        .card-title {
+            font-size: 1.5rem;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .card-text {
+            font-size: 1rem;
+            color: #666;
+        }
+
+        /* Media Queries for Responsiveness */
+        @media (max-width: 768px) {
+            .card {
+                max-width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Time counter and graph visualization tool</h1>
+        <div class="row">
+            <!-- First Card -->
+            <div class="card" onclick="window.location.href='counter.html'">
+                <div class="card-body">
+                    <h5 class="card-title">Time Counter</h5>
+                    <p class="card-text">Learn more about our time counter tool.</p>
+                </div>
+            </div>
+            <!-- Second Card -->
+            <div class="card" onclick="window.location.href='graph.html'">
+                <div class="card-body">
+                    <h5 class="card-title">Graph Visualization</h5>
+                    <p class="card-text">Explore our graph visualization features.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>
